@@ -17,12 +17,24 @@
   :root{--bg:#0F1A24;--paper:#16232F;--ink:#E6EDF3;--mute:#93A4B5;--line:#2A3A49;--lula:#E0303F;--flavio:#13A84B;--nodata:#2E3640;--stroke:#0F1A24}
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.45}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.45;overflow-wrap:anywhere}
 main{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
 h1{font-stretch:75%;font-weight:800;font-size:clamp(26px,4.5vw,40px);margin:0 0 16px;letter-spacing:-.01em}
 
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin-bottom:20px}
-.nums{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:12px}
+.nums{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:12px}
+@media (max-width:560px){
+  main{padding:14px max(12px,env(safe-area-inset-right)) 32px max(12px,env(safe-area-inset-left))}
+  .panel{padding:14px}
+  .nums{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
+  .urnas{grid-column:1/-1;order:3;padding:6px 0 0;border-top:1px solid var(--line)}
+  .cand .pc{font-size:clamp(44px,15vw,64px)}
+  .cand .vt{font-size:13px}
+  figure{padding:12px}
+  .pick label{font-size:16px}
+  svg.zoom text{font-size:24px}
+}
 .cand .nm{font-weight:700;font-size:15px}
 .cand .pc{font-stretch:62%;font-weight:800;font-size:clamp(52px,10vw,104px);line-height:.92;font-variant-numeric:tabular-nums}
 .cand .vt{color:var(--mute);font-size:14px;font-variant-numeric:tabular-nums}
@@ -44,7 +56,7 @@ figcaption{font-weight:700;font-size:18px;margin-bottom:2px}
 .apur{font-weight:400;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums}
 .apur b{font-stretch:75%;font-weight:800;font-size:22px;color:var(--ink)}
 figure .sub{color:var(--mute);font-size:13px;margin-bottom:8px}
-svg.map{width:100%;height:auto;display:block}
+svg.map{width:100%;height:auto;display:block;overflow:hidden}
 svg.map path{stroke:var(--stroke);stroke-width:.8;cursor:pointer;transition:filter .15s}
 svg.map path:hover,svg.map path:focus{filter:brightness(1.15);outline:none;stroke-width:1.6}
 svg.map text{font-family:var(--font);font-weight:700;fill:#fff;paint-order:stroke;stroke:rgba(0,0,0,.55);stroke-width:2.6px;pointer-events:none;text-anchor:middle;dominant-baseline:middle;font-variant-numeric:tabular-nums}
@@ -62,7 +74,7 @@ svg.map text{font-family:var(--font);font-weight:700;fill:#fff;paint-order:strok
 .maps>figure{min-width:0}
 .pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .pick label{font-weight:700;font-size:18px}
-.pick select{font:inherit;font-size:15px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);max-width:100%}
+.pick select{font:inherit;font-size:16px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);max-width:100%}
 .res{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:14px;margin:10px 0 8px;font-variant-numeric:tabular-nums}
 .res b{font-weight:800} .res .ll{color:var(--lula)} .res .ff{color:var(--flavio)} .res .m{color:var(--mute)}
 svg.zoom{max-height:620px}
@@ -217,13 +229,13 @@ function resumo(json) {
   (function walk(o) {
     if (Array.isArray(o)) return o.forEach(walk);
     if (!o || typeof o !== 'object') return;
-    if ('nm' in o && 'vap' in o) cands.set(o.sqcand ?? o.n ?? o.nm, { nm: o.nm, vap: num(o.vap) });
+    if ('nm' in o && 'vap' in o) cands.set(o.sqcand ?? o.n ?? o.nm, { nm: o.nm, nmu: o.nmu, vap: num(o.vap) });
     Object.values(o).forEach(walk);
   })(json);
   const list = [...cands.values()];
   const vv = num(deep(json, 'vv')) || list.reduce((a, c) => a + c.vap, 0);
   const L = list.find(c => CFG.LULA.test(norm(c.nm))), F = list.find(c => CFG.FLAVIO.test(norm(c.nm)));
-  return { l: L?.vap || 0, f: F?.vap || 0, nmL: L?.nm, nmF: F?.nm, vv,
+  return { l: L?.vap || 0, f: F?.vap || 0, nmL: L?.nmu || L?.nm, nmF: F?.nmu || F?.nm, vv,
            // s.st/s.ts direto: deep('st') acharia antes o "st" (situação) de cada candidato
            st: num(json.s?.st), pst: num(json.s?.pst ?? deep(json, 'pst')), s: num(json.s?.ts), hg: deep(json, 'hg') };
 }
