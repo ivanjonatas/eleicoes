@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logs — Apuração 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F3; --paper:#FFFFFF; --ink:#102A43; --mute:#5E7186; --line:#CBD5DC;
+  --lula:#C8102E; --flavio:#009C3B; --nodata:#3B4148;
+  --ok:#007A2E; --warn:#A35F00; --bad:#C8102E;
+  --font:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0F1A24;--paper:#16232F;--ink:#E6EDF3;--mute:#93A4B5;--line:#2A3A49;--lula:#E0303F;--flavio:#13A84B;--nodata:#2E3640;
+        --ok:#2DBE62;--warn:#E8A33A;--bad:#F0505C}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.45}
+main{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;margin:0 0 16px}
+h1{font-stretch:75%;font-weight:800;font-size:clamp(26px,4.5vw,40px);margin:0;letter-spacing:-.01em}
+h2{font-size:18px;margin:0}
+a{color:var(--mute);font-size:14px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px;margin-bottom:16px}
+
+/* auditoria */
+.audit{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:16px}
+.audit .panel{margin:0}
+.kpi .k{color:var(--mute);font-size:13px;font-weight:600}
+.kpi .v{font-stretch:75%;font-weight:800;font-size:clamp(40px,6vw,56px);line-height:1.05;font-variant-numeric:tabular-nums;margin:2px 0 4px}
+.kpi .d{color:var(--mute);font-size:13px;font-variant-numeric:tabular-nums}
+.kpi .d b{color:var(--ink)}
+.flag{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;margin-top:6px}
+.flag::before{content:"";width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.flag.ok{color:var(--ok)} .flag.warn{color:var(--warn)} .flag.bad{color:var(--bad)} .flag.mute{color:var(--mute)}
+.flag.warn::before{border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.flag.bad::before{border-radius:1px;transform:rotate(45deg) scale(.85)}
+.errs{list-style:none;margin:8px 0 0;padding:0;font-size:13px;font-variant-numeric:tabular-nums}
+.errs li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-top:1px solid var(--line)}
+.errs li span:last-child{font-weight:700}
+
+/* gráfico */
+.hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;margin-bottom:4px}
+.sub{color:var(--mute);font-size:13px;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--mute)}
+.legend .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.chart{display:grid;grid-template-columns:auto 1fr;gap:0 8px}
+.yax{position:relative;height:240px;width:34px;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums}
+.yax span{position:absolute;right:0;transform:translateY(-50%)}
+.plot{position:relative;height:240px;display:flex;gap:6px;align-items:stretch}
+.plot .ref{position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--mute);opacity:.7;pointer-events:none;z-index:1}
+.col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:default;border-radius:4px 4px 0 0;outline-offset:2px}
+.col i{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;font-style:normal;font-size:12px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col .f{background:var(--flavio);border-radius:4px 4px 0 0}
+.col .l{background:var(--lula)}
+.col.err{border:1px dashed var(--bad);justify-content:center;align-items:center;color:var(--bad);font-size:12px;font-weight:700;background:color-mix(in srgb,var(--bad) 6%,var(--paper))}
+.col.rep i{opacity:.55}
+.col:hover i,.col:focus i{filter:brightness(1.12);opacity:1}
+.xax{display:flex;gap:6px;margin-top:6px;grid-column:2}
+.xax div{flex:1 1 0;min-width:0;text-align:center;font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;line-height:1.3}
+.xax b{display:block;font-size:12px;color:var(--ink)}
+.vazio-g{grid-column:1/-1;padding:40px 0;text-align:center;color:var(--mute)}
+@media (max-width:760px){.col i span{display:none} .xax .t{display:none}}
+
+#tip{position:fixed;z-index:10;pointer-events:none;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:none;min-width:200px;font-variant-numeric:tabular-nums}
+#tip b{display:block;font-size:14px;margin-bottom:4px}
+#tip .r{display:flex;justify-content:space-between;gap:12px;align-items:center}
+#tip .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+#tip .m{color:var(--mute);margin-top:4px}
+
+/* lista */
+.stats{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;color:var(--mute);font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink);font-size:16px}
+.live{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mute)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.live.on .dot{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.ctl select,.ctl input,.ctl button{font:inherit;font-size:16px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+.ctl input[type=search]{flex:1 1 200px;min-width:0}
+.ctl button{cursor:pointer}
+.ctl button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.ctl label{display:flex;align-items:center;gap:6px;font-size:14px}
+.tbl{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--paper)}
+td.n{text-align:right}
+td.u{font-family:var(--mono);font-size:12px;white-space:normal;overflow-wrap:anywhere;min-width:260px}
+td.u a{color:inherit;font-size:inherit;text-decoration:none}
+td.u a:hover{text-decoration:underline}
+.st{font-weight:700} .st.ok{color:var(--ok)} .st.bad{color:var(--bad)}
+.tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--mute)}
+.tag.novo{border-color:var(--ok);color:var(--ok)}
+tr.bad td{background:color-mix(in srgb,var(--bad) 7%,var(--paper))}
+tr.novo td{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:color-mix(in srgb,var(--ok) 18%,var(--paper))}}
+.vazio{padding:28px 16px;text-align:center;color:var(--mute)}
+.nota{color:var(--mute);font-size:13px;margin-top:10px}
+@media (max-width:560px){main{padding:14px 12px 32px}.panel{padding:14px}}
+@media (prefers-reduced-motion:reduce){tr.novo td{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1>Logs e auditoria</h1><a href="index.html">Voltar ao painel</a></div>
+
+  <section class="audit">
+    <div class="panel kpi">
+      <div class="k">Sem dados novos do TSE há</div>
+      <div class="v" id="a-parado">—</div>
+      <div class="d" id="a-parado-d">Aguardando a primeira consulta do total Brasil.</div>
+      <div class="flag mute" id="a-parado-f" hidden></div>
+    </div>
+    <div class="panel kpi">
+      <div class="k">Requisições com erro</div>
+      <div class="v" id="a-err">0</div>
+      <div class="d" id="a-err-d">de 0 requisições</div>
+      <ul class="errs" id="a-err-l"></ul>
+    </div>
+    <div class="panel kpi">
+      <div class="k">Requisições</div>
+      <div class="v" id="a-total">0</div>
+      <div class="d" id="a-total-d">&nbsp;</div>
+      <div class="live" id="live" style="margin-top:8px"><span class="dot"></span><span id="live-txt">Aguardando o painel…</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="hd">
+      <h2>Lula × Flávio nas últimas 15 consultas do total Brasil</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--lula)"></i>Lula</span>
+        <span><i class="sw" style="background:var(--flavio)"></i>Flávio</span>
+        <span><i class="sw" style="background:var(--mute);opacity:.55"></i>tom claro = mesmos dados da consulta anterior</span>
+      </div>
+    </div>
+    <div class="sub">Percentual sobre os votos válidos em cada resposta do TSE. A linha tracejada marca 50%; embaixo de cada barra, a hora da consulta e a vantagem de quem lidera, em pontos percentuais. Passe o mouse numa barra para ver os detalhes.</div>
+    <div class="chart">
+      <div class="yax"><span style="top:0">100%</span><span style="top:50%">50%</span><span style="top:100%">0%</span></div>
+      <div class="plot" id="plot"></div>
+      <div class="xax" id="xax"></div>
+    </div>
+  </section>
+
+  <section class="panel ctl">
+    <select id="f-tipo" aria-label="Tipo de requisição"><option value="">Todos os tipos</option></select>
+    <label><input type="checkbox" id="f-err"> Só erros</label>
+    <input type="search" id="f-q" placeholder="Filtrar pela URL" aria-label="Filtrar pela URL">
+    <button id="b-pausa" aria-pressed="false">Pausar</button>
+    <button id="b-limpa">Limpar</button>
+  </section>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Hora</th><th>Tipo</th><th>Status</th><th class="n">Tempo</th><th class="n">Tamanho</th><th>Gerado no TSE</th><th>Dados</th><th>URL</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="vazio" id="vazio">Nenhuma requisição ainda. Deixe o <a href="index.html" target="_blank" rel="noopener">painel</a> aberto em outra aba: as consultas aparecem aqui na hora.</div>
+  </div>
+  <p class="nota">Os logs vêm do painel aberto neste navegador. Ficam guardadas as últimas 1.000 requisições, e a tabela mostra até 500. "Gerado no TSE" é o horário de Brasília em que o TSE gerou o arquivo; "repetido" quer dizer que o arquivo é o mesmo da consulta anterior à mesma URL.</p>
+</main>
+<div id="tip"></div>
+
+<script>
+const LOG_KEY = 'apuracao-logs', MAX_LINHAS = 500, N_GRAF = 15, ALERTA_MIN = 5;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hora = ts => new Date(ts).toLocaleTimeString('pt-BR', { hour12: false });
+const horaMs = ts => hora(ts) + '.' + String(ts % 1000).padStart(3, '0');
+const tam = b => b == null ? '—' : b < 1024 ? `${b} B` : `${(b / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB`;
+const fmt = n => n.toLocaleString('pt-BR');
+const pct = (n, d = 2) => n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
+const dur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+  return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`; };
+// "25/10/2026 19:47:59" (Brasília, UTC-3) -> timestamp
+const tsGer = g => { const m = g?.match(/(\d\d)\/(\d\d)\/(\d{4}) (\d\d:\d\d:\d\d)/); return m ? Date.parse(`${m[3]}-${m[2]}-${m[1]}T${m[4]}-03:00`) : NaN; };
+const horaGer = g => g?.split(' ')[1] || '—';
+const motivo = e => e.status ? `HTTP ${e.status}` : e.erro ? (/fetch|network/i.test(e.erro) ? 'rede/CORS' : e.erro) : 'falhou';
+
+const S = { logs: [], ids: new Set(), pausa: false, pendentes: [], ultimo: 0, tipos: new Set() };
+
+function lerGuardados() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
+}
+// marca cada resposta como novo/repetido comparando com a resposta anterior da mesma URL
+function marcarNovos() {
+  const ult = {};
+  for (const e of S.logs) {
+    if (!e.ger) { e._novo = null; continue; }
+    e._novo = ult[e.url] !== e.ger; ult[e.url] = e.ger;
+  }
+}
+function adicionar(ents, novos) {
+  const add = ents.filter(e => e && e.id && !S.ids.has(e.id));
+  if (!add.length) return;
+  for (const e of add) { S.ids.add(e.id); S.logs.push(e); S.ultimo = Math.max(S.ultimo, e.ts); novoTipo(e.tipo); }
+  if (S.logs.length > 1000) S.logs.splice(0, S.logs.length - 1000).forEach(e => S.ids.delete(e.id));
+  marcarNovos();
+  desenhar(novos ? new Set(add.map(e => e.id)) : null);
+  grafico();
+}
+function novoTipo(t) {
+  if (!t || S.tipos.has(t)) return;
+  S.tipos.add(t);
+  const sel = $('#f-tipo'), opts = [...S.tipos].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const v = sel.value;
+  sel.replaceChildren(new Option('Todos os tipos', ''), ...opts.map(o => new Option(o, o)));
+  sel.value = v;
+}
+
+/* ---------- tabela ---------- */
+function filtrados() {
+  const tipo = $('#f-tipo').value, so = $('#f-err').checked, q = $('#f-q').value.trim().toLowerCase();
+  return S.logs.filter(e => (!tipo || e.tipo === tipo) && (!so || !e.ok) && (!q || e.url.toLowerCase().includes(q)));
+}
+function desenhar(novos) {
+  const lista = filtrados().slice(-MAX_LINHAS).reverse();
+  $('#rows').innerHTML = lista.map(e => {
+    const st = e.ok ? e.status : e.status ? e.status : `falhou: ${e.erro || ''}`;
+    const tag = e._novo == null ? '' : `<span class="tag ${e._novo ? 'novo' : ''}">${e._novo ? 'novo' : 'repetido'}</span>`;
+    const cand = e.pl != null ? ` Lula ${pct(e.pl)} · Flávio ${pct(e.pf)}` : '';
+    return `<tr class="${e.ok ? '' : 'bad'}${novos?.has(e.id) ? ' novo' : ''}">
+      <td>${horaMs(e.ts)}</td><td>${esc(e.tipo)}</td><td class="st ${e.ok ? 'ok' : 'bad'}">${esc(st)}</td>
+      <td class="n">${e.ms != null ? fmt(e.ms) + ' ms' : '—'}</td><td class="n">${tam(e.bytes)}</td>
+      <td>${esc(horaGer(e.ger))}</td><td>${tag}${cand}</td>
+      <td class="u"><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)}</a></td></tr>`;
+  }).join('');
+  $('#vazio').hidden = S.logs.length > 0;
+  auditoria();
+}
+
+/* ---------- auditoria ---------- */
+function auditoria() {
+  const agora = Date.now(), L = S.logs;
+
+  // tempo parado: desde a consulta do total Brasil que trouxe a geração atual do TSE
+  const br = L.filter(e => e.tipo === 'Brasil' && e.ok && e.ger), ult = br[br.length - 1];
+  const fl = $('#a-parado-f');
+  if (!ult) {
+    $('#a-parado').textContent = '—';
+    $('#a-parado-d').textContent = 'Aguardando a primeira consulta do total Brasil.';
+    fl.hidden = true;
+  } else {
+    let k = br.length - 1; while (k > 0 && br[k - 1].ger === ult.ger) k--;
+    const desde = br[k].ts, repet = br.length - 1 - k, tg = tsGer(ult.ger);
+    $('#a-parado').textContent = dur(agora - desde);
+    $('#a-parado-d').innerHTML = `TSE gerou os dados atuais às <b>${esc(horaGer(ult.ger))}</b> de Brasília`
+      + (isNaN(tg) ? '' : ` (há ${dur(agora - tg)})`)
+      + `. Chegaram aqui às ${hora(desde)}; desde então, <b>${fmt(repet)}</b> ${repet === 1 ? 'consulta repetiu' : 'consultas repetiram'} os mesmos dados.`;
+    fl.hidden = false;
+    if (ult.pst >= 100) { fl.className = 'flag ok'; fl.textContent = 'Apuração concluída: 100% das urnas'; }
+    else if (agora - desde > ALERTA_MIN * 60_000) { fl.className = 'flag warn'; fl.textContent = `Atenção: mais de ${ALERTA_MIN} min sem atualização`; }
+    else { fl.className = 'flag ok'; fl.textContent = 'Recebendo atualizações normalmente'; }
+  }
+
+  // erros
+  const errs = L.filter(e => !e.ok);
+  $('#a-err').textContent = fmt(errs.length);
+  $('#a-err').style.color = errs.length ? 'var(--bad)' : '';
+  $('#a-err-d').innerHTML = L.length
+    ? `${pct(errs.length / L.length * 100, 1)} de ${fmt(L.length)} requisições`
+      + (errs.length ? ` · último às <b>${hora(errs[errs.length - 1].ts)}</b>` : '')
+      + (errs.filter(e => agora - e.ts < 60_000).length ? ` · ${fmt(errs.filter(e => agora - e.ts < 60_000).length)} no último minuto` : '')
+    : 'Nenhuma requisição ainda';
+  const grupos = {};
+  for (const e of errs) { const k = `${motivo(e)} · ${e.tipo}`; grupos[k] = (grupos[k] || 0) + 1; }
+  $('#a-err-l').innerHTML = Object.entries(grupos).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([k, n]) => `<li><span>${esc(k)}</span><span>${fmt(n)}</span></li>`).join('');
+
+  // volume e ao vivo
+  const min = L.filter(e => agora - e.ts < 60_000), ms = min.filter(e => e.ms != null);
+  $('#a-total').textContent = fmt(L.length);
+  $('#a-total-d').textContent = `${fmt(min.length)} no último minuto`
+    + (ms.length ? ` · tempo médio ${fmt(Math.round(ms.reduce((a, e) => a + e.ms, 0) / ms.length))} ms` : '');
+  const seg = S.ultimo ? Math.round((agora - S.ultimo) / 1000) : null, on = seg != null && seg < 45;
+  $('#live').classList.toggle('on', on && !S.pausa);
+  $('#live-txt').textContent = S.pausa ? `Pausado (${fmt(S.pendentes.length)} novas aguardando)`
+    : on ? `Ao vivo: última requisição há ${seg}s`
+    : seg != null ? `Sem requisições há ${dur(agora - S.ultimo)}. O painel está aberto?` : 'Aguardando o painel…';
+}
+
+/* ---------- gráfico: últimas 15 consultas do total Brasil ---------- */
+function grafico() {
+  const ult = S.logs.filter(e => e.tipo === 'Brasil').slice(-N_GRAF);
+  const plot = $('#plot'), xax = $('#xax');
+  if (!ult.length) { plot.innerHTML = '<div class="vazio-g">Sem consultas do total Brasil ainda.</div>'; xax.innerHTML = ''; return; }
+  plot.innerHTML = '<div class="ref"></div>' + ult.map((e, i) => {
+    if (!e.ok || e.pl == null) return `<div class="col err" tabindex="0" data-i="${i}">${e.ok ? '—' : '✕'}</div>`;
+    const tot = e.pl + e.pf || 1;
+    return `<div class="col${e._novo === false ? ' rep' : ''}" tabindex="0" data-i="${i}">
+      <i class="f" style="flex:${e.pf / tot}"><span>${pct(e.pf)}</span></i>
+      <i class="l" style="flex:${e.pl / tot}"><span>${pct(e.pl)}</span></i></div>`;
+  }).join('');
+  // vantagem de quem lidera, em pontos percentuais: as barras quase empatadas não mostram a diferença
+  const vant = e => e.pl == null ? '' : e.pl === e.pf ? 'empate' : `${e.pl > e.pf ? 'Lula' : 'Flávio'} +${(Math.abs(e.pl - e.pf)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  xax.innerHTML = ult.map((e, i) => `<div>${i === ult.length - 1 ? '<b>agora</b>' : ''}<span class="t">${hora(e.ts)}<br>${vant(e)}</span></div>`).join('');
+  plot.querySelectorAll('.col').forEach(c => {
+    const e = ult[+c.dataset.i];
+    c.addEventListener('pointermove', ev => dica(ev, e));
+    c.addEventListener('pointerleave', () => $('#tip').style.display = 'none');
+    c.addEventListener('focus', () => { const b = c.getBoundingClientRect(); dica({ clientX: b.left + b.width / 2, clientY: b.top }, e); });
+    c.addEventListener('blur', () => $('#tip').style.display = 'none');
+  });
+}
+function dica(ev, e) {
+  const tip = $('#tip');
+  tip.innerHTML = `<b>Consulta das ${horaMs(e.ts)}</b>` + (!e.ok
+    ? `<div class="r" style="color:var(--bad)">Falhou: ${esc(motivo(e))}</div>`
+    : e.pl == null ? '<div class="m">Sem votos na resposta</div>'
+    : `<div class="r"><span><i class="sw" style="background:var(--lula)"></i>Lula</span><b style="margin:0">${pct(e.pl)}</b></div>
+       <div class="r"><span><i class="sw" style="background:var(--flavio)"></i>Flávio</span><b style="margin:0">${pct(e.pf)}</b></div>
+       <div class="m">${e.pst != null ? pct(e.pst) + ' das urnas apuradas<br>' : ''}TSE gerou às ${esc(horaGer(e.ger))} · ${e._novo ? 'dados novos' : 'mesmos dados da consulta anterior'}<br>${fmt(e.ms)} ms</div>`);
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(ev.clientX + 14, innerWidth - w - 8)) + 'px';
+  tip.style.top = Math.max(8, Math.min(ev.clientY + 14, innerHeight - h - 8)) + 'px';
+}
+
+/* ---------- entrada dos logs ---------- */
+function receber(ents) {
+  if (S.pausa) { S.pendentes.push(...ents); auditoria(); return; }
+  adicionar(ents, true);
+}
+
+// ao vivo: BroadcastChannel; sem ele, o evento "storage" (o painel grava em lote a cada 1s)
+if ('BroadcastChannel' in window) new BroadcastChannel(LOG_KEY).onmessage = m => receber([m.data]);
+else addEventListener('storage', e => { if (e.key === LOG_KEY) receber(lerGuardados().filter(x => !S.ids.has(x.id))); });
+
+$('#f-tipo').addEventListener('change', () => desenhar());
+$('#f-err').addEventListener('change', () => desenhar());
+$('#f-q').addEventListener('input', () => desenhar());
+$('#b-pausa').addEventListener('click', e => {
+  S.pausa = !S.pausa;
+  e.target.setAttribute('aria-pressed', S.pausa);
+  e.target.textContent = S.pausa ? 'Continuar' : 'Pausar';
+  if (!S.pausa) { const p = S.pendentes; S.pendentes = []; adicionar(p, true); }
+  auditoria();
+});
+$('#b-limpa').addEventListener('click', () => {
+  S.logs = []; S.ids.clear(); S.pendentes = []; S.ultimo = 0;
+  try { localStorage.removeItem(LOG_KEY); } catch {}
+  desenhar(); grafico();
+});
+
+adicionar(lerGuardados(), false);
+desenhar(); grafico();
+setInterval(auditoria, 1000);
+</script>
+</body>
+</html>

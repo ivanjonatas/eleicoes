@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Apuração 2026 — Presidente</title>
+<title>Apuração 2026 — Presidente, 2º turno</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -20,7 +20,9 @@
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.45;overflow-wrap:anywhere}
 main{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
-h1{font-stretch:75%;font-weight:800;font-size:clamp(26px,4.5vw,40px);margin:0 0 16px;letter-spacing:-.01em}
+h1{font-stretch:75%;font-weight:800;font-size:clamp(26px,4.5vw,40px);margin:0;letter-spacing:-.01em}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;margin:0 0 16px}
+.lnk{color:var(--mute);font-size:14px}
 
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin-bottom:20px}
 .nums{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:12px}
@@ -97,7 +99,7 @@ footer{color:var(--mute);font-size:13px;margin-top:20px}
 </head>
 <body>
 <main>
-  <h1>Apuração para Presidente, 1º turno</h1>
+  <div class="top"><h1>Apuração para Presidente, 2º turno</h1><a class="lnk" href="logs.html" target="_blank" rel="noopener">Logs das requisições</a></div>
   <div class="err" id="err"></div>
 
   <section class="panel" id="panel">
@@ -162,9 +164,9 @@ const GEO_EU={"w":620,"h":556,"r":[{"id":"Reino Unido","d":"M110.2,285.7L101.6,2
 <script>
 /* ===================== CONFIGURAÇÃO ===================== */
 const CFG = {
-  // Direto no TSE. Se der erro de CORS, use o proxy do seu domínio: '/tse/oficial/ele2026/6257'
-  BASE: 'https://resultados.tse.jus.br/oficial/ele2026/6257',
-  ELEICAO: '006257',         // 2º turno (25/10): base .../6258 e '006258'
+  // Direto no TSE. Se der erro de CORS, use o proxy do seu domínio: '/tse/oficial/ele2026/6258'
+  BASE: 'https://resultados.tse.jus.br/oficial/ele2026/6258',
+  ELEICAO: '006258',         // 2º turno (25/10); o 1º turno era .../6257 e '006257'
   CARGO: '0001',
   INTERVALO_BR: 10_000,      // total + 27 estados
   INTERVALO_EU: 30_000,      // cidades europeias (uma requisição por cidade)
@@ -213,12 +215,62 @@ const fmtPct = (n, d = 2) => n.toLocaleString('pt-BR', { minimumFractionDigits: 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const url = abr => `${CFG.BASE}/dados/${abr.slice(0,2)}/${abr}-c${CFG.CARGO}-e${CFG.ELEICAO}-u.json`;
 
-async function getJSON(u) {
-  // no-cache = revalida com o CDN (If-Modified-Since/ETag): se nada mudou, volta 304 sem baixar de novo
-  const r = await fetch(u, { cache: 'no-cache' });
-  if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; }
-  return r.json();
+/* Registro das requisições, lido pela página logs.html: ao vivo pelo BroadcastChannel e,
+   para quem abrir os logs depois, as últimas LOG_MAX no localStorage. */
+const LOG_KEY = 'apuracao-logs', LOG_MAX = 1000;
+const LOG = { canal: 'BroadcastChannel' in window ? new BroadcastChannel(LOG_KEY) : null, fila: [], timer: null, seq: 0 };
+function tipoReq(u) {
+  if (u.includes('ibge.gov.br')) return 'IBGE';
+  if (u.includes('world-atlas')) return 'mapa';
+  if (u.includes('/config/')) return 'config';
+  if (/-ab\.json$/.test(u)) return 'municípios';
+  const abr = u.match(/\/([a-z]{2}\d*)-c\d+-e/)?.[1] || '';
+  return abr === 'br' ? 'Brasil' : abr.startsWith('zz') ? 'exterior' : /\d/.test(abr) ? 'município' : 'estado';
 }
+function registrar(ent) {
+  ent.id = `${Date.now().toString(36)}-${++LOG.seq}`;
+  try { LOG.canal?.postMessage(ent); } catch {}
+  LOG.fila.push(ent);
+  // grava em lote: os municípios disparam centenas de requisições de uma vez
+  LOG.timer ??= setTimeout(() => {
+    LOG.timer = null;
+    try {
+      const velho = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+      localStorage.setItem(LOG_KEY, JSON.stringify(velho.concat(LOG.fila).slice(-LOG_MAX)));
+    } catch {}
+    LOG.fila = [];
+  }, 1000);
+}
+// json = true: lê o corpo e registra também a hora de geração do TSE (para saber se veio dado novo)
+// e, no arquivo do Brasil, os percentuais dos candidatos
+async function req(u, opts, json = false) {
+  const t0 = performance.now(), ent = { ts: Date.now(), url: u, tipo: tipoReq(u) };
+  try {
+    const r = await fetch(u, opts);
+    Object.assign(ent, { status: r.status, ok: r.ok,
+      bytes: +r.headers.get('content-length') || null, mod: r.headers.get('last-modified') });
+    if (!json) { ent.ms = Math.round(performance.now() - t0); registrar(ent); return r; }
+    if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; }
+    const j = await r.json();
+    ent.ms = Math.round(performance.now() - t0);
+    if (j.dg && j.hg) ent.ger = `${j.dg} ${j.hg}`;
+    if (ent.tipo === 'Brasil') {
+      const R = resumo(j), base = R.vv || R.l + R.f;
+      if (base) Object.assign(ent, { pl: R.l / base * 100, pf: R.f / base * 100 });
+      ent.pst = R.pst;
+    }
+    registrar(ent);
+    return j;
+  } catch (e) {
+    ent.ms = Math.round(performance.now() - t0);
+    if (!e.status) Object.assign(ent, { status: ent.status || 0, ok: false, erro: e.message || String(e) });
+    registrar(ent);
+    throw e;
+  }
+}
+
+// no-cache = revalida com o CDN (If-Modified-Since/ETag): se nada mudou, volta 304 sem baixar de novo
+const getJSON = u => req(u, { cache: 'no-cache' }, true);
 function deep(o, key) {
   if (!o || typeof o !== 'object') return undefined;
   if (key in o && typeof o[key] !== 'object') return o[key];
@@ -335,7 +387,7 @@ function painel(R) {
 function erro(e) {
   const box = $('#err'); box.style.display = 'block';
   box.innerHTML = e instanceof TypeError
-    ? 'O navegador bloqueou a consulta ao TSE (CORS ou rede). Configure o proxy no seu domínio e troque <code>CFG.BASE</code> para <code>/tse/oficial/ele2026/6257</code>.'
+    ? 'O navegador bloqueou a consulta ao TSE (CORS ou rede). Configure o proxy no seu domínio e troque <code>CFG.BASE</code> para <code>/tse/oficial/ele2026/6258</code>.'
     : `Falha ao ler o TSE (${esc(e.message)}). Tentando de novo.`;
 }
 
@@ -484,7 +536,7 @@ function escolher(tipo, id) {
 function resumoUF() { if (MUN.uf) $('#res-uf').innerHTML = linhaRes(DADOS.br[MUN.uf]); }
 
 async function malhaUF(uf) {
-  return MUN.geo[uf] ??= fetch(`https://servicodados.ibge.gov.br/api/v3/malhas/estados/${uf}?formato=application/vnd.geo%2Bjson&qualidade=minima&intrarregiao=municipio`)
+  return MUN.geo[uf] ??= req(`https://servicodados.ibge.gov.br/api/v3/malhas/estados/${uf}?formato=application/vnd.geo%2Bjson&qualidade=minima&intrarregiao=municipio`)
     .then(r => { if (!r.ok) throw new Error(`IBGE HTTP ${r.status}`); return r.json(); })
     .catch(e => { delete MUN.geo[uf]; throw e; });
 }
@@ -566,7 +618,7 @@ function topoParaGeo(t) {
   });
 }
 function mundo() {
-  return EUC.mundo ??= fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json')
+  return EUC.mundo ??= req('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json')
     .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(topoParaGeo)
     .catch(e => { EUC.mundo = null; throw e; });
 }
